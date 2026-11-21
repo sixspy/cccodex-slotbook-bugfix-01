@@ -4,9 +4,16 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from auth import AuthHeader, require_user
-from db import connect
+from db import connect, write_audit
 
 router = APIRouter(tags=["audit"])
+
+FULL_REJECT_ACTION = "hold_full_reject"
+
+
+def record_full_reject(conn, actor: str, target: str, payload: dict | None = None) -> None:
+    """满档拒占审计（甲路径）。与候补写入同事务：写失败则拒写同败。"""
+    write_audit(conn, actor, FULL_REJECT_ACTION, target, payload or {})
 
 
 @router.get("/api/audit")

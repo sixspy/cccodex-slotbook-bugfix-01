@@ -1,0 +1,32 @@
+{
+  "slots": [
+    {
+      "code": "S-FULL-01",
+      "title": "满场复现档",
+      "start_at": "2026-11-21T22:00:00",
+      "end_at": "2026-11-21T23:00:00",
+      "capacity": 4,
+      "booked": 0,
+      "status": "开放",
+      "generation": 1
+    }
+  ],
+  "holds": [
+    {
+      "slot_code": "S-FULL-01",
+      "party_key": "P-FULL-A",
+      "seats": 2,
+      "status": "占位中",
+      "expire_at": "2026-12-31T23:59:59",
+      "created_at": "2026-11-21T10:00:00"
+    },
+    {
+      "slot_code": "S-FULL-01",
+      "party_key": "P-FULL-B",
+      "seats": 2,
+      "status": "占位中",
+      "expire_at": "2026-12-31T23:59:59",
+      "created_at": "2026-11-21T10:05:00"
+    }
+  ]
+}

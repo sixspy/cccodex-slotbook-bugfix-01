@@ -18,22 +18,27 @@ class LockIn(BaseModel):
 
 def try_acquire(conn, lock_key: str, holder: str) -> bool:
     now = datetime.now().isoformat(timespec="seconds")
+    # INSERT OR IGNORE 是原子的：两人同时抢，SQLite 写锁只放一个进。
+    cur = conn.execute(
+        "INSERT OR IGNORE INTO slot_locks(lock_key,holder,acquired_at) VALUES (?,?,?)",
+        (lock_key, holder, now),
+    )
+    if cur.rowcount == 1:
+        # 锁先行落库：并发请求才看得见，后到才会走争用分支。
+        conn.commit()
+        return True
     row = conn.execute(
         "SELECT holder FROM slot_locks WHERE lock_key=?", (lock_key,)
     ).fetchone()
-    if row is None:
-        conn.execute(
-            "INSERT INTO slot_locks(lock_key,holder,acquired_at) VALUES (?,?,?)",
-            (lock_key, holder, now),
-        )
-        return True
-    if row["holder"] == holder:
+    if row and row["holder"] == holder:
         return True
     conn.execute(
         """INSERT INTO contention_log(lock_key,actor,action,detail,created_at)
            VALUES (?,?,?,?,?)""",
-        (lock_key, holder, "争用", f"持有者={row['holder']}", now),
+        (lock_key, holder, "争用", f"持有者={row['holder'] if row else '未知'}", now),
     )
+    # 争用痕独立提交，不随业务事务回滚被吞掉。
+    conn.commit()
     return False
 
 

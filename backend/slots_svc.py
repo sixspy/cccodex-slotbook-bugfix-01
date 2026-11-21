@@ -13,6 +13,26 @@ from locks import release, require_lock
 router = APIRouter(tags=["slots"])
 
 
+def seat_view(conn, slot) -> dict:
+    """全仓唯一可占席口径：容量 - 已订 - 占位中（甲路径）。"""
+    pending = conn.execute(
+        "SELECT COALESCE(SUM(seats),0) s FROM holds WHERE slot_id=? AND status='占位中'",
+        (slot["id"],),
+    ).fetchone()["s"]
+    capacity = int(slot["capacity"])
+    booked = int(slot["booked"])
+    pending = int(pending)
+    free = max(0, capacity - booked - pending)
+    return {
+        "capacity": capacity,
+        "booked": booked,
+        "pending_seats": pending,
+        "free_seats": free,
+        "display_free": free,
+        "sold_out": capacity - booked - pending <= 0,
+    }
+
+
 class SlotIn(BaseModel):
     code: str
     title: str
@@ -32,7 +52,12 @@ def list_slots(authorization: AuthHeader = None):
         rows = conn.execute(
             "SELECT * FROM slots ORDER BY start_at, code"
         ).fetchall()
-        return {"items": [dict(r) for r in rows]}
+        items = []
+        for row in rows:
+            d = dict(row)
+            d.update(seat_view(conn, row))
+            items.append(d)
+        return {"items": items}
 
 
 @router.get("/api/slots/{code}")
@@ -43,9 +68,7 @@ def get_slot(code: str, authorization: AuthHeader = None):
         if not row:
             raise HTTPException(404, "档期不存在")
         d = dict(row)
-        # BUGFIX-01 埋雷：售罄角标只看 booked，掩盖占位中占用
-        d["sold_out"] = int(d["booked"]) >= int(d["capacity"])
-        d["display_free"] = max(0, int(d["capacity"]) - int(d["booked"]))
+        d.update(seat_view(conn, row))
         return d
 
 

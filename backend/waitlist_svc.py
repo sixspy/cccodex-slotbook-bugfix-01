@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from auth import AuthHeader, require_user, require_writer
 from db import connect, write_audit
 from locks import release, require_lock
+from slots_svc import seat_view
 
 router = APIRouter(tags=["waitlist"])
 
@@ -63,11 +64,7 @@ def promote_wait(body: PromoteIn, authorization: AuthHeader = None):
         try:
             if wrow["status"] != "候补中":
                 raise HTTPException(409, "候补非候补中")
-            pending = conn.execute(
-                "SELECT COALESCE(SUM(seats),0) s FROM holds WHERE slot_id=? AND status='占位中'",
-                (slot["id"],),
-            ).fetchone()["s"]
-            free = int(slot["capacity"]) - int(slot["booked"]) - int(pending)
+            free = seat_view(conn, slot)["free_seats"]
             if wrow["seats"] > free:
                 raise HTTPException(409, "仍无足够空位，禁止晋升")
             now = datetime.now().isoformat(timespec="seconds")
